@@ -3,6 +3,10 @@ Links:
 - https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions
 
 TODO:
+- Figure out the permission denied error I got:
+```
+failed to run extension: fork/exec /Users/nathaniel.morihara/.local/share/gh-tidy/gh-tidy: permission denied
+```
 - Figure out jq as a dependency
 - Man page and docs and stuff
 - Cleanup comments
