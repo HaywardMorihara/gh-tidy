@@ -3,7 +3,7 @@ Links:
 - https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions
 
 TODO:
-- master or main
+- Figure out jq as a dependency
 - Man page and docs and stuff
 - Cleanup comments
 - Configure what runs
