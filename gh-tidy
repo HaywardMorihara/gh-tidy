@@ -52,14 +52,18 @@ function set_master_or_main() {
     fi
 }
 set_master_or_main
-echo "Determined $trunk_branch as the trunk branch"
+echo
+echo "Determined '$trunk_branch' as the trunk branch"
 
+echo
 echo "Tidying your Git workspace..."
 
+echo
 echo "Switching to $trunk_branch to pull the latest..."
 git checkout $trunk_branch
 git pull origin $trunk_branch
 
+echo
 echo "Pruning local branches that show as 'merged' to local $trunk_branch..."
 for branch in $(git branch --merged $trunk_branch --format='%(refname:short)' | grep -v $trunk_branch); do
     read -p "Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) " -n 1 -r
@@ -72,6 +76,7 @@ echo "Complete!"
 # TODO Message if none found
 
 # Covers branches that get squashed & merged
+echo
 echo "Pruning YOUR local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
@@ -87,4 +92,5 @@ done
 echo "Complete!"
 # TODO Message if none found
 
+echo
 echo "Finished tidying!"
