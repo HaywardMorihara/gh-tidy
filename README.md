@@ -2,6 +2,16 @@
 
 [Github CLI Extension](https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions) for tidying your Git workspace!
 
+`gh tidy` does several things:
+* Checks out master/main and pulls the latest from remote origin
+* Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
+* Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+
+`jq` is a dependency that will need to be installed if you don't already have it:
+* `brew install jq` on Mac
+* `suto apt-get install jq` on Debian/Ubuntu
+* See https://stedolan.github.io/jq/download/ for other OSs
+
 ## Installation
 ```sh
 gh extension install HaywardMorihara/gh-tidy
