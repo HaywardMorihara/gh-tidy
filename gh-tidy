@@ -1,6 +1,19 @@
 #!/bin/bash
 set -e
 
+if ! type -p jq >/dev/null; then
+    echo "jq not found on the system" >&2
+    echo
+    echo "To install on Debian/Ubuntu, please run:"
+    echo "sudo apt-get install jq"
+    echo
+    echo "To install on Mac, please run:"
+    echo "brew install jq"
+    echo
+    echo "For other OSs, please see https://stedolan.github.io/jq/download/"
+    exit 1
+fi
+
 function set_master_or_main() {
     local master_branch=$(git branch --list master)
     if [[ ! -z ${master_branch} ]]; then
