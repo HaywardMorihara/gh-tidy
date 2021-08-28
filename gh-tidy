@@ -1,6 +1,31 @@
 #!/bin/bash
 set -e
 
+help() {
+    cat <<EOF
+Usage: gh tidy
+
+Tidies your work space!
+
+"Tidying" here means several things:
+* Checks out master/main and pulls the latest from remote origin
+* Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
+* Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+
+Dependencies: jq
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+  -h|--help)
+    help
+    exit 0
+    ;;
+  esac
+  shift
+done
+
 if ! type -p jq >/dev/null; then
     echo "jq not found on the system" >&2
     echo
@@ -35,7 +60,7 @@ echo "Switching to $trunk_branch to pull the latest..."
 git checkout $trunk_branch
 git pull origin $trunk_branch
 
-echo "Pruning local branches that are the same as local $trunk_branch..."
+echo "Pruning local branches that show as 'merged' to local $trunk_branch..."
 for branch in $(git branch --merged $trunk_branch --format='%(refname:short)' | grep -v $trunk_branch); do
     read -p "Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) " -n 1 -r
     echo
@@ -47,7 +72,7 @@ echo "Complete!"
 # TODO Message if none found
 
 # Covers branches that get squashed & merged
-echo "Pruning MY local branches that have had their pull requests merged on Github..."
+echo "Pruning YOUR local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
     merged_branch=$(gh pr list --author @me --state merged --json headRefName --limit 1 --search head:$branch | jq -r '.[].headRefName')
