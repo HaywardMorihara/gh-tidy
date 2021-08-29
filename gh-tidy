@@ -60,8 +60,12 @@ echo "Tidying your Git workspace..."
 
 echo
 echo "Switching to $trunk_branch to pull the latest..."
-git checkout $trunk_branch
-git pull origin $trunk_branch
+if [[ -z $GH_TIDY_DEV_MODE ]]; then
+    git checkout $trunk_branch
+    git pull origin $trunk_branch
+else
+    echo "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
+fi
 
 echo
 echo "Pruning local branches that show as 'merged' to local $trunk_branch..."
