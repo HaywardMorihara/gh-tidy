@@ -26,16 +26,42 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+
+# https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
+function color_echo() {
+    no_color='\033[0m'
+    local color=$1
+    shift
+    echo -e "$color$@$no_color"
+}
+
+function cyan() {
+    color_echo '\033[0;96m' "$@"
+}
+
+function magenta() {
+    color_echo '\033[0;95m' "$@"
+}
+
+function green() {
+    color_echo '\033[0;92m' "$@"
+}
+
+function red() {
+    color_echo '\033[0;31m' "$@"
+}
+
+
 if ! type -p jq >/dev/null; then
-    echo "jq not found on the system" >&2
+    red "jq not found on the system" >&2
     echo
-    echo "To install on Debian/Ubuntu, please run:"
-    echo "sudo apt-get install jq"
+    red "To install on Debian/Ubuntu, please run:"
+    red "sudo apt-get install jq"
     echo
-    echo "To install on Mac, please run:"
-    echo "brew install jq"
+    red "To install on Mac, please run:"
+    red "brew install jq"
     echo
-    echo "For other OSs, please see https://stedolan.github.io/jq/download/"
+    red "For other OSs, please see https://stedolan.github.io/jq/download/"
     exit 1
 fi
 
@@ -53,48 +79,48 @@ function set_master_or_main() {
 }
 set_master_or_main
 echo
-echo "Determined '$trunk_branch' as the trunk branch"
+cyan "Determined '$trunk_branch' as the trunk branch"
 
 echo
-echo "Tidying your Git workspace..."
+cyan "Tidying your Git workspace..."
 
 echo
-echo "Switching to $trunk_branch to pull the latest..."
+cyan "Switching to $trunk_branch to pull the latest..."
 if [[ -z $GH_TIDY_DEV_MODE ]]; then
     git checkout $trunk_branch
     git pull origin $trunk_branch
 else
-    echo "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
+    magenta "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
 fi
 
 echo
-echo "Pruning local branches that show as 'merged' to local $trunk_branch..."
+cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
 for branch in $(git branch --merged $trunk_branch --format='%(refname:short)' | grep -v $trunk_branch); do
-    read -p "Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) " -n 1 -r
+    read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[93m' -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         git branch -D "${branch}" || true
     fi
 done
-echo "Complete!"
+green "Complete!"
 # TODO Message if none found
 
 # Covers branches that get squashed & merged
 echo
-echo "Pruning YOUR local branches that have had their pull requests merged on Github..."
+cyan "Pruning YOUR local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
     merged_branch=$(gh pr list --author @me --state merged --json headRefName --limit 1 --search head:$branch | jq -r '.[].headRefName')
     if [ ! -z ${merged_branch} ]; then
-        read -p "Branch ${merged_branch} has been merged - delete it? (y/n) " -n 1 -r
+        read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             git branch -D "${merged_branch}" || true
         fi
     fi
 done
-echo "Complete!"
+green "Complete!"
 # TODO Message if none found
 
 echo
-echo "Finished tidying!"
+green "Finished tidying!"
