@@ -17,6 +17,13 @@ gh extension install HaywardMorihara/gh-tidy
 * `suto apt-get install jq` on Debian/Ubuntu
 * See https://stedolan.github.io/jq/download/ for other OSs
 
+## Usage
+Simply run
+```sh
+gh tidy
+```
+and it will checkout master/main, pull the latest, and clean up branches for you (with your permission, of course).
+
 ## Troubleshooting
 If you get an error such as:
 ```sh
