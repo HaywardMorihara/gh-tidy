@@ -11,8 +11,6 @@ Tidies your work space!
 * Checks out master/main and pulls the latest from remote origin
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
-
-Dependencies: jq
 EOF
 }
 
@@ -46,24 +44,6 @@ function magenta() {
 function green() {
     color_echo '\033[0;92m' "$@"
 }
-
-function red() {
-    color_echo '\033[0;31m' "$@"
-}
-
-
-if ! type -p jq >/dev/null; then
-    red "jq not found on the system" >&2
-    echo
-    red "To install on Debian/Ubuntu, please run:"
-    red "sudo apt-get install jq"
-    echo
-    red "To install on Mac, please run:"
-    red "brew install jq"
-    echo
-    red "For other OSs, please see https://stedolan.github.io/jq/download/"
-    exit 1
-fi
 
 function set_master_or_main() {
     local master_branch=$(git branch --list master)
@@ -110,7 +90,7 @@ echo
 cyan "Pruning YOUR local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
-    merged_branch=$(gh pr list --author @me --state merged --json headRefName --limit 1 --search head:$branch | jq -r '.[].headRefName')
+    merged_branch=$(gh pr list --author @me --state merged --limit 1 --search head:$branch --json headRefName --jq '.[].headRefName')
     if [ ! -z ${merged_branch} ]; then
         read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
         echo
