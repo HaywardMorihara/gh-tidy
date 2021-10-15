@@ -12,11 +12,6 @@
 gh extension install HaywardMorihara/gh-tidy
 ```
 
-`jq` is a dependency that will need to be installed if you don't already have it:
-* `brew install jq` on Mac
-* `suto apt-get install jq` on Debian/Ubuntu
-* See https://stedolan.github.io/jq/download/ for other OSs
-
 ## Usage
 Simply run
 ```sh
