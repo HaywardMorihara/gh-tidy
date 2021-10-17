@@ -12,6 +12,11 @@
 gh extension install HaywardMorihara/gh-tidy
 ```
 
+## Updating
+```sh
+gh extension upgrade HaywardMorihara/gh-tidy
+```
+
 ## Usage
 Simply run
 ```sh
