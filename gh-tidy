@@ -45,6 +45,21 @@ function green() {
     color_echo '\033[0;92m' "$@"
 }
 
+function red() {
+    color_echo '\033[0;31m' "$@"
+}
+
+# https://stackoverflow.com/questions/35978550/how-to-show-uncommitted-changes-in-git-and-some-git-diffs-in-detail
+cyan "Checking for staged and unstaged changes..."
+if [[ $(git diff HEAD) ]]; then
+    red "ERROR: Unstaged/staged changes found:"
+    git diff HEAD --stat
+    red "ERROR: Please stash or commit your changes before tidying."
+    exit 1
+else
+    echo "No staged nor unstaged commits found."
+fi
+
 function set_master_or_main() {
     local master_branch=$(git branch --list master)
     if [[ ! -z ${master_branch} ]]; then
