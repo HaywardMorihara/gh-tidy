@@ -9,6 +9,7 @@ Tidies your work space!
 
 "Tidying" here means several things:
 * Checks out master/main and pulls the latest from remote origin
+* Runs 'git gc' to clean up unnecessary files & optimize your local repo
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
 EOF
@@ -49,6 +50,7 @@ function red() {
     color_echo '\033[0;31m' "$@"
 }
 
+echo
 # https://stackoverflow.com/questions/35978550/how-to-show-uncommitted-changes-in-git-and-some-git-diffs-in-detail
 cyan "Checking for staged and unstaged changes..."
 if [[ $(git diff HEAD) ]]; then
@@ -87,6 +89,11 @@ if [[ -z $GH_TIDY_DEV_MODE ]]; then
 else
     magenta "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
 fi
+
+echo
+cyan "Cleaning unnecessary files & optimizing your local repo..."
+git gc
+green "Complete!"
 
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
