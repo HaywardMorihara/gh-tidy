@@ -2,6 +2,8 @@
 
 [Github CLI Extension](https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions) for tidying your Git workspace!
 
+![gh tidy demo](./gh-tidy-demo.gif)
+
 `gh tidy` does several things:
 * Checks out master/main and pulls the latest from remote origin
 * Runs 'git gc' to clean up unnecessary files & optimize your local repo
