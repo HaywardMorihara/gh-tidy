@@ -7,6 +7,7 @@
 * Runs 'git gc' to clean up unnecessary files & optimize your local repo
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+* If flagged, rebases all your local branches to the latest master
 
 ## Installation
 ```sh
