@@ -50,6 +50,10 @@ function red() {
     color_echo '\033[0;31m' "$@"
 }
 
+function yellow() {
+    color_echo '\033[0;93m' "$@"
+}
+
 echo
 # https://stackoverflow.com/questions/35978550/how-to-show-uncommitted-changes-in-git-and-some-git-diffs-in-detail
 cyan "Checking for staged and unstaged changes..."
@@ -123,6 +127,13 @@ for branch in $(git branch --format='%(refname:short)'); do
 done
 green "Complete!"
 # TODO Message if none found
+
+echo
+cyan "Checking if there are updates available for 'gh-tidy'..."
+gh extension upgrade HaywardMorihara/gh-tidy --dry-run | grep "would have upgraded from" && \
+    echo "Upgrade by running: " && \
+    yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
+|| green "No available updates found"
 
 echo
 green "Finished tidying!"
