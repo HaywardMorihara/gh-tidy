@@ -12,14 +12,26 @@ Tidies your work space!
 * Runs 'git gc' to clean up unnecessary files & optimize your local repo
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+
+Options:
+
+    --rebase-all
+        Rebases all your local branches to the latest master.
+
 EOF
 }
+
+
+REBASE_ALL=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
   -h|--help)
     help
     exit 0
+    ;;
+  --rebase-all)
+    REBASE_ALL=true
     ;;
   esac
   shift
@@ -60,10 +72,10 @@ cyan "Checking for staged and unstaged changes..."
 if [[ $(git diff HEAD) ]]; then
     red "ERROR: Unstaged/staged changes found:"
     git diff HEAD --stat
-    red "ERROR: Please stash or commit your changes before tidying."
+    red "Please stash or commit your changes before tidying."
     exit 1
 else
-    echo "No staged nor unstaged commits found."
+    green "No staged nor unstaged commits found."
 fi
 
 function set_master_or_main() {
@@ -128,12 +140,36 @@ done
 green "Complete!"
 # TODO Message if none found
 
+if "$REBASE_ALL"; then
+    problem_branches=()
+    echo
+    cyan "Rebasing ALL local branches on to latest master..."
+    # https://stackoverflow.com/questions/3846380/how-to-iterate-through-all-git-branches-using-bash-script
+    for branch in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
+        echo
+        cyan "Rebasing ${branch}..."
+        git checkout "${branch}"
+        { git rebase main && green "Successfully rebase ${branch}!"; } || \
+        { git rebase --abort && problem_branches+=("${branch}") && yellow "WARNING: Problem rebasing ${branch}"; }
+    done
+    echo
+    green "Finished rebasing!"     
+fi
+
 echo
 cyan "Checking if there are updates available for 'gh-tidy'..."
 gh extension upgrade HaywardMorihara/gh-tidy --dry-run | grep "would have upgraded from" && \
     echo "Upgrade by running: " && \
     yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
 || green "No available updates found"
+
+echo
+if (( ${#problem_branches[@]} )); then
+    yellow "WARNING: Unable to auto-rebase the following branches:"
+    for problem_branch in "${problem_branches[@]}"; do
+        yellow $problem_branch
+    done
+fi
 
 echo
 green "Finished tidying!"
