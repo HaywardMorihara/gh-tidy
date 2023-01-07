@@ -152,6 +152,7 @@ if "$REBASE_ALL"; then
         { git rebase main && green "Successfully rebase ${branch}!"; } || \
         { git rebase --abort && problem_branches+=("${branch}") && yellow "WARNING: Problem rebasing ${branch}"; }
     done
+    git checkout "${trunk_branch}"
     echo
     green "Finished rebasing!"     
 fi
@@ -167,7 +168,7 @@ echo
 if (( ${#problem_branches[@]} )); then
     yellow "WARNING: Unable to auto-rebase the following branches:"
     for problem_branch in "${problem_branches[@]}"; do
-        yellow $problem_branch
+        yellow "    * ${problem_branch}"
     done
 fi
 
