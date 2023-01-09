@@ -149,7 +149,7 @@ if "$REBASE_ALL"; then
         echo
         cyan "Rebasing ${branch}..."
         git checkout "${branch}"
-        { git rebase main && green "Successfully rebase ${branch}!"; } || \
+        { git rebase "${trunk_branch}" && green "Successfully rebase ${branch}!"; } || \
         { git rebase --abort && problem_branches+=("${branch}") && yellow "WARNING: Problem rebasing ${branch}"; }
     done
     git checkout "${trunk_branch}"
