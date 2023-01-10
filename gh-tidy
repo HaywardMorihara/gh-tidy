@@ -14,7 +14,6 @@ Tidies your work space!
     * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
 
 Options:
-
     --rebase-all
         Rebases all your local branches to the latest master.
 
