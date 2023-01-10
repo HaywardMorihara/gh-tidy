@@ -21,8 +21,9 @@ Options:
 EOF
 }
 
-
+# TODO I don't _love_ how there's a mix of additive/subtractive flags...
 REBASE_ALL=false
+SKIP_GC=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,6 +33,9 @@ while [ $# -gt 0 ]; do
     ;;
   --rebase-all)
     REBASE_ALL=true
+    ;;
+  --skip-gc)
+    SKIP_GC=true
     ;;
   esac
   shift
@@ -106,10 +110,12 @@ else
     magenta "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
 fi
 
-echo
-cyan "Cleaning unnecessary files & optimizing your local repo..."
-git gc
-green "Complete!"
+if ! "$SKIP_GC"; then
+    echo
+    cyan "Cleaning unnecessary files & optimizing your local repo..."
+    git gc
+    green "Complete!"
+fi
 
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
