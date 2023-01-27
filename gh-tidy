@@ -16,7 +16,8 @@ Tidies your work space!
 Options:
     --rebase-all
         Rebases all your local branches to the latest master.
-
+    --skip-gc
+	Skips the 'git gc' step (which executes by default)
 EOF
 }
 
