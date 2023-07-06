@@ -88,7 +88,7 @@ function set_master_or_main() {
         trunk_branch="master"
         return
     fi
-    
+
     local main_branch=$(git branch --list main)
     if [[ ! -z ${main_branch} ]]; then
         trunk_branch="main"
@@ -117,13 +117,27 @@ if ! "$SKIP_GC"; then
     green "Complete!"
 fi
 
+# Function to check if the branch (specified as an argument) can be deleted
+function can_delete_branch() {
+    local branch=$1
+    if [[ "$branch" == "$trunk_branch" ]]; then
+        return 1  # Branch is equal to trunk_branch, return false
+    else
+        return 0  # Branch is not equal to trunk_branch, return true
+    fi
+}
+
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
-for branch in $(git branch --merged $trunk_branch --format='%(refname:short)' | grep -v $trunk_branch); do
-    read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[93m' -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        git branch -D "${branch}" || true
+for branch in $(git branch --merged $trunk_branch --format='%(refname:short)'); do
+    if can_delete_branch "$branch"; then
+        read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[93m' -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git branch -D "${branch}" || true
+        fi
+    else
+        green "Skipping deletion of branch '$branch'."
     fi
 done
 green "Complete!"
@@ -134,13 +148,17 @@ echo
 cyan "Pruning YOUR local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
-    merged_branch=$(gh pr list --author @me --state merged --limit 1 --search head:$branch --json headRefName --jq '.[].headRefName')
-    if [ ! -z ${merged_branch} ]; then
-        read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git branch -D "${merged_branch}" || true
+    if can_delete_branch "$branch"; then
+        merged_branch=$(gh pr list --author @me --state merged --limit 1 --search head:$branch --json headRefName --jq '.[].headRefName')
+        if [ ! -z ${merged_branch} ]; then
+            read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                git branch -D "${merged_branch}" || true
+            fi
         fi
+    else
+        green "Skipping deletion of branch '$branch'."
     fi
 done
 green "Complete!"
@@ -160,7 +178,7 @@ if "$REBASE_ALL"; then
     done
     git checkout "${trunk_branch}"
     echo
-    green "Finished rebasing!"     
+    green "Finished rebasing!"
 fi
 
 echo
