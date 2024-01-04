@@ -193,14 +193,14 @@ case "${unameOut}" in
 esac
 if [ "${machine}" == "Mac" ]; then
     # https://stackoverflow.com/questions/11337041/force-line-buffering-of-stdout-in-a-pipeline/11337109#11337109
-    script -q /dev/null gh extension upgrade HaywardMorihara/gh-tidy --dry-run | grep "Would have upgraded extension" && \
+    script -q /dev/null gh extension upgrade HaywardMorihara/gh-tidy --dry-run | grep "would have upgraded from" && \
     echo "Upgrade by running: " && \
     yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
     || green "No available updates found"
 fi
 if [ "${machine}" == "Linux" ]; then
     # https://stackoverflow.com/questions/11337041/force-line-buffering-of-stdout-in-a-pipeline/11337109#11337109
-    script -q -c "gh extension upgrade HaywardMorihara/gh-tidy --dry-run" /dev/null | grep "Would have upgraded extension" && \
+    script -q -c "gh extension upgrade HaywardMorihara/gh-tidy --dry-run" /dev/null | grep "would have upgraded from" && \
     echo "Upgrade by running: " && \
     yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
     || green "No available updates found"
