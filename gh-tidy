@@ -110,6 +110,8 @@ function set_master_or_main() {
     if [[ ! -z ${main_branch} ]]; then
         trunk_branch="main"
     fi
+
+    red "No trunk branch found; specify one with the --trunk <branch-name> flag"
 }
 set_master_or_main
 echo
