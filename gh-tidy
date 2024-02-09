@@ -18,12 +18,15 @@ Options:
         Rebases all your local branches to the latest master.
     --skip-gc
 	Skips the 'git gc' step (which executes by default)
+    --trunk branch-name
+    Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
 EOF
 }
 
 # TODO I don't _love_ how there's a mix of additive/subtractive flags...
 REBASE_ALL=false
 SKIP_GC=false
+TRUNK_BRANCH=''
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -36,6 +39,10 @@ while [ $# -gt 0 ]; do
     ;;
   --skip-gc)
     SKIP_GC=true
+    ;;
+  --trunk)
+    shift
+    TRUNK_BRANCH=$1
     ;;
   esac
   shift
@@ -83,6 +90,16 @@ else
 fi
 
 function set_master_or_main() {
+    if [[ ! -z ${TRUNK_BRANCH} ]]; then
+        local user_trunk_branch=$(git branch --list ${TRUNK_BRANCH})
+        if [[ ! -z ${user_trunk_branch} ]]; then
+            trunk_branch=${TRUNK_BRANCH}
+            return
+        else
+            yellow "WARNING: Specified trunk branch '${TRUNK_BRANCH}' not found - defaulting to 'master' or 'main'"
+        fi
+    fi
+
     local master_branch=$(git branch --list master)
     if [[ ! -z ${master_branch} ]]; then
         trunk_branch="master"
