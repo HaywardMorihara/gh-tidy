@@ -28,6 +28,8 @@ gh tidy
 ```
 and it will checkout master/main, pull the latest, and clean up branches for you (with your permission, of course).
 
+If your repo doesn't _have_ a master/main branch, you can specify your trunk branch with the `--trunk <branchname>` parameter
+
 ## Troubleshooting
 If you get an error such as:
 ```sh
