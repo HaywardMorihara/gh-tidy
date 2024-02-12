@@ -26,7 +26,7 @@ EOF
 # TODO I don't _love_ how there's a mix of additive/subtractive flags...
 REBASE_ALL=false
 SKIP_GC=false
-TRUNK_BRANCH=''
+TRUNK_BRANCH_PARAM=''
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -42,7 +42,7 @@ while [ $# -gt 0 ]; do
     ;;
   --trunk)
     shift
-    TRUNK_BRANCH=$1
+    TRUNK_BRANCH_PARAM=$1
     ;;
   esac
   shift
@@ -89,14 +89,14 @@ else
     green "No staged nor unstaged commits found."
 fi
 
-function set_master_or_main() {
-    if [[ ! -z ${TRUNK_BRANCH} ]]; then
-        local user_trunk_branch=$(git branch --list ${TRUNK_BRANCH})
+function set_trunk_branch() {
+    if [[ ! -z ${TRUNK_BRANCH_PARAM} ]]; then
+        local user_trunk_branch=$(git branch --list ${TRUNK_BRANCH_PARAM})
         if [[ ! -z ${user_trunk_branch} ]]; then
-            trunk_branch=${TRUNK_BRANCH}
+            trunk_branch=${TRUNK_BRANCH_PARAM}
             return
         else
-            yellow "WARNING: Specified trunk branch '${TRUNK_BRANCH}' not found - defaulting to 'master' or 'main'"
+            yellow "WARNING: Specified trunk branch '${TRUNK_BRANCH_PARAM}' not found - defaulting to 'master' or 'main'"
         fi
     fi
 
@@ -109,11 +109,13 @@ function set_master_or_main() {
     local main_branch=$(git branch --list main)
     if [[ ! -z ${main_branch} ]]; then
         trunk_branch="main"
+        return
     fi
 
     red "No trunk branch found; specify one with the --trunk <branch-name> flag"
 }
-set_master_or_main
+
+set_trunk_branch
 echo
 cyan "Determined '$trunk_branch' as the trunk branch"
 
