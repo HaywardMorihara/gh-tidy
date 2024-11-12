@@ -204,7 +204,7 @@ for remote_branch in $(git branch --remote --format='%(refname:short)'); do
         echo
     # TODO optimize by concatenating all branches to delete them with a single push
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git push origin -D "${merged_branch}" || true
+            git push origin --no-verify -D "${merged_branch}" || true
         fi
     fi
 done
