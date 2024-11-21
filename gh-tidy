@@ -192,22 +192,23 @@ done
 green "Complete!"
 # TODO Message if none found
 
-if "$CLEAN_REMOTE"; then
 # Covers remote branches that got squashed & merged
-echo
-cyan "Pruning all remote branches that have had their pull requests merged on Github..."
-for remote_branch in $(git branch --remote --format='%(refname:short)'); do
-    branch=$(echo branch|sed -e 's/origin\//')
-    merged_branch=$(gh pr list --state merged --limit 1 --head $branch --json headRefName --jq '.[].headRefName')
-    if [ ! -z ${merged_branch} ]; then
-        read -p $'\e[93m'"Remote branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
-        echo
-    # TODO optimize by concatenating all branches to delete them with a single push
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git push origin --no-verify -D "${merged_branch}" || true
+if "$CLEAN_REMOTE"; then
+    echo
+    cyan "Pruning all remote branches that have had their pull requests merged on Github..."
+    for remote_branch in $(git branch --remote --format='%(refname:short)'); do
+        branch=$(echo branch|sed -e 's/origin\///')
+        merged_branch=$(gh pr list --state merged --limit 1 --head $branch --json headRefName --jq '.[].headRefName')
+        if [ ! -z ${merged_branch} ]; then
+            read -p $'\e[93m'"Remote branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
+            echo
+        # TODO optimize by concatenating all branches to delete them with a single push
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                git push origin --no-verify -D "${merged_branch}" || true
+            fi
         fi
-    fi
-done
+    done
+fi
 green "Complete!"
 # TODO Message if none found
 
