@@ -30,6 +30,19 @@ and it will checkout master/main, pull the latest, and clean up branches for you
 
 If your repo doesn't _have_ a master/main branch, you can specify your trunk branch with the `--trunk <branchname>` parameter
 
+### Default Flags
+
+You can set default flag values in the `.github/gh-tidy-config.yaml` file under the `default_flags` section. These values will be used unless overridden by command-line options.
+
+Example configuration:
+
+```yaml
+default_flags:
+  rebase_all: true
+  skip_gc: true
+  trunk_branch: main
+```
+
 ## Troubleshooting
 If you get an error such as:
 ```sh
