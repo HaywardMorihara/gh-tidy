@@ -126,7 +126,7 @@ echo
 cyan "Switching to $trunk_branch to pull the latest..."
 if [[ -z $GH_TIDY_DEV_MODE ]]; then
     git checkout $trunk_branch
-    git pull origin $trunk_branch
+    git pull
 else
     magenta "GH_TIDY_DEV_MODE: Skipping $trunk_branch checkout & update because in GH_TIDY_DEV_MODE"
 fi
