@@ -129,7 +129,7 @@ if [[ -z $GH_TIDY_DEV_MODE ]]; then
     trunk_remote="$(git config --get "branch.$(git branch --show-current).remote" || echo "")"
     if [[ -z "$trunk_remote" ]]; then
         # when the trunk branch doesn't have a remote set, try pulling from origin
-        git pull origin $trunk_branch
+        git pull origin "$trunk_branch"
     else
         git pull
     fi
