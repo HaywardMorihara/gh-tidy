@@ -127,7 +127,7 @@ cyan "Switching to $trunk_branch to pull the latest..."
 if [[ -z $GH_TIDY_DEV_MODE ]]; then
     git checkout $trunk_branch
     trunk_remote="$(git config --get "branch.$(git branch --show-current).remote" || echo "")"
-    if [[ -z $trunk_remote ]]; then
+    if [[ -z "$trunk_remote" ]]; then
         # when the trunk branch doesn't have a remote set, try pulling from origin
         git pull origin $trunk_branch
     else
