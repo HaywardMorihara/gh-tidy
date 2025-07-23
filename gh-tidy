@@ -144,13 +144,26 @@ if ! "$SKIP_GC"; then
     green "Complete!"
 fi
 
+# Function to check if a branch exists locally
+function show_ref_locally() {
+    local branch_name=$1
+    if [ ! -z "$branch_name" ]; then
+        output=$(git show-ref --verify refs/heads/"$branch_name")
+        # split to get the ref name
+        ref=$(echo "$output" | cut -d' ' -f2)
+        echo "$ref"
+    fi
+}
+
 # Function to check if the branch (specified as an argument) can be deleted
 function can_delete_branch() {
     local branch=$1
     if [[ "$branch" == "$trunk_branch" ]]; then
         return 1  # Branch is equal to trunk_branch, return false
+    elif ! show_ref_locally "$branch"; then
+        return 1  # Branch does not exist locally, return false
     else
-        return 0  # Branch is not equal to trunk_branch, return true
+        return 0  # Branch exists locally, return true
     fi
 }
 
