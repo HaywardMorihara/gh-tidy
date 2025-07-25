@@ -144,19 +144,31 @@ if ! "$SKIP_GC"; then
     green "Complete!"
 fi
 
+# Function to check if a branch exists locally
+function branch_exists_locally() {
+    local branch="$1"
+    if git branch --list "$branch" >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Function to check if the branch (specified as an argument) can be deleted
 function can_delete_branch() {
-    local branch=$1
+    local branch="$1"
     if [[ "$branch" == "$trunk_branch" ]]; then
         return 1  # Branch is equal to trunk_branch, return false
+    elif ! branch_exists_locally "$branch"; then
+        return 1  # Branch does not exist locally, return false
     else
-        return 0  # Branch is not equal to trunk_branch, return true
+        return 0  # Branch exists locally, return true
     fi
 }
 
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
-for branch in $(git branch --merged $trunk_branch --format='%(refname:short)'); do
+for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)'); do
     if can_delete_branch "$branch"; then
         read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[93m' -n 1 -r
         echo
@@ -176,8 +188,8 @@ cyan "Pruning YOUR local branches that have had their pull requests merged on Gi
 for branch in $(git branch --format='%(refname:short)'); do
     # TODO Make this work with collaborative branches where you aren't the author
     if can_delete_branch "$branch"; then
-        merged_branch=$(gh pr list --author @me --state merged --limit 1 --search head:$branch --json headRefName --jq '.[].headRefName')
-        if [ ! -z ${merged_branch} ]; then
+        merged_branch=$(gh pr list --author @me --state merged --limit 1 --search "head:$branch" --json headRefName --jq '.[].headRefName')
+        if [ -n "${merged_branch}" ] && [ "${merged_branch}" == "${branch}" ]; then
             read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
