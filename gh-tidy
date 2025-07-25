@@ -20,33 +20,13 @@ Options:
 	Skips the 'git gc' step (which executes by default)
     --trunk branch-name
     Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+    -h, --help
+        Show this help message.
+
+Default Flags:
+    You can set default flag values in the .github/gh-tidy-config.yaml file under the default_flags section. These values will be used unless overridden by command-line options.
 EOF
 }
-
-# TODO I don't _love_ how there's a mix of additive/subtractive flags...
-REBASE_ALL=false
-SKIP_GC=false
-TRUNK_BRANCH_PARAM=''
-
-while [ $# -gt 0 ]; do
-  case "$1" in
-  -h|--help)
-    help
-    exit 0
-    ;;
-  --rebase-all)
-    REBASE_ALL=true
-    ;;
-  --skip-gc)
-    SKIP_GC=true
-    ;;
-  --trunk)
-    shift
-    TRUNK_BRANCH_PARAM=$1
-    ;;
-  esac
-  shift
-done
 
 
 # https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
@@ -76,6 +56,43 @@ function red() {
 function yellow() {
     color_echo '\033[0;93m' "$@"
 }
+
+
+# TODO I don't _love_ how there's a mix of additive/subtractive flags...
+REBASE_ALL=false
+SKIP_GC=false
+TRUNK_BRANCH_PARAM=''
+
+function read_config() {
+    if [[ -f ".github/gh-tidy-config.yaml" ]]; then
+        cyan "Reading configuration from .github/gh-tidy-config.yaml..."
+        REBASE_ALL=$(grep -E '^  rebase_all:' .github/gh-tidy-config.yaml | awk -F ": " '{print $2}' | tr -d '[:space:]' || echo "false")
+        SKIP_GC=$(grep -E '^  skip_gc:' .github/gh-tidy-config.yaml | awk -F ": " '{print $2}' | tr -d '[:space:]' || echo "false")
+        TRUNK_BRANCH_PARAM=$(grep -E '^  trunk_branch:' .github/gh-tidy-config.yaml | awk -F ": " '{print $2}' | tr -d '[:space:]' || echo "")
+    fi
+}
+read_config
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+  -h|--help)
+    help
+    exit 0
+    ;;
+  --rebase-all)
+    REBASE_ALL=true
+    ;;
+  --skip-gc)
+    SKIP_GC=true
+    ;;
+  --trunk)
+    shift
+    TRUNK_BRANCH_PARAM=$1
+    ;;
+  esac
+  shift
+done
+
 
 echo
 # https://stackoverflow.com/questions/35978550/how-to-show-uncommitted-changes-in-git-and-some-git-diffs-in-detail
