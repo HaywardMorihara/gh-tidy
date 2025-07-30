@@ -135,9 +135,6 @@ if [[ -z $GH_TIDY_DEV_MODE ]]; then
     if ! "$SKIP_PRUNE"; then
         cyan "Fetching and pruning remote branches..."
         git fetch --prune
-    else
-        cyan "Fetching remote branches (skipping prune)..."
-        git fetch
     fi
     trunk_remote="$(git config --get "branch.$(git branch --show-current).remote" || echo "")"
     if [[ -z "$trunk_remote" ]]; then
