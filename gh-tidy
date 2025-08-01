@@ -12,6 +12,7 @@ Tidies your work space!
     * Runs 'git gc' to clean up unnecessary files & optimize your local repo
     * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
     * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+    * Checks remote branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
 
 Options:
     --rebase-all
@@ -22,6 +23,8 @@ Options:
 	Skips the 'git fetch --prune' step (which executes by default)
     --trunk branch-name
     Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+    --clean-remote
+    cleans up remote (origin) branches that had their PRs merged
 EOF
 }
 
@@ -30,6 +33,7 @@ REBASE_ALL=false
 SKIP_GC=false
 SKIP_PRUNE=false
 TRUNK_BRANCH_PARAM=''
+CLEAN_REMOTE=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,6 +53,9 @@ while [ $# -gt 0 ]; do
   --trunk)
     shift
     TRUNK_BRANCH_PARAM=$1
+    ;;
+  --clean-remote)
+    CLEAN_REMOTE=true
     ;;
   esac
   shift
@@ -212,6 +219,27 @@ for branch in $(git branch --format='%(refname:short)'); do
 done
 green "Complete!"
 # TODO Message if none found
+
+# Covers remote branches that got squashed & merged
+if "$CLEAN_REMOTE"; then
+    echo
+    cyan "Pruning all remote branches that have had their pull requests merged on Github..."
+    for remote_branch in $(git branch --remote --format='%(refname:short)'); do
+        branch=$(echo branch|sed -e 's/origin\///')
+        merged_branch=$(gh pr list --state merged --limit 1 --head $branch --json headRefName --jq '.[].headRefName')
+        if [ ! -z ${merged_branch} ]; then
+            read -p $'\e[93m'"Remote branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
+            echo
+        # TODO optimize by concatenating all branches to delete them with a single push
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                git push origin --no-verify -D "${merged_branch}" || true
+            fi
+        fi
+    done
+fi
+green "Complete!"
+# TODO Message if none found
+
 
 if "$REBASE_ALL"; then
     problem_branches=()
