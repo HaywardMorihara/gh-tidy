@@ -26,11 +26,11 @@ Options:
     Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
 
 Environment Variables:
-    GH_TIDY_REBASE_ALL      Set to 'true' to rebase all branches (same as --rebase-all)
-    GH_TIDY_SKIP_GC         Set to 'true' to skip git gc (same as --skip-gc)
-    GH_TIDY_SKIP_PRUNE      Set to 'true' to skip git fetch --prune (same as --skip-prune)
+    GH_TIDY_REBASE_ALL         Set to 'true' to rebase all branches (same as --rebase-all)
+    GH_TIDY_SKIP_GC            Set to 'true' to skip git gc (same as --skip-gc)
+    GH_TIDY_SKIP_PRUNE         Set to 'true' to skip git fetch --prune (same as --skip-prune)
     GH_TIDY_SKIP_UPDATE_CHECK  Set to 'true' to skip update check (same as --skip-update-check)
-    GH_TIDY_TRUNK_BRANCH    Set trunk branch name (same as --trunk)
+    GH_TIDY_TRUNK_BRANCH       Set trunk branch name (same as --trunk)
 
 Note: CLI flags override environment variables. Boolean values accept: 1/true/yes/on or 0/false/no/off
 EOF
