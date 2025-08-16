@@ -20,6 +20,8 @@ Options:
 	Skips the 'git gc' step (which executes by default)
     --skip-prune
 	Skips the 'git fetch --prune' step (which executes by default)
+    --skip-update-check
+	Skips checking for updates to gh-tidy extension
     --trunk branch-name
     Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
 EOF
@@ -29,6 +31,7 @@ EOF
 REBASE_ALL=false
 SKIP_GC=false
 SKIP_PRUNE=false
+SKIP_UPDATE_CHECK=false
 TRUNK_BRANCH_PARAM=''
 
 while [ $# -gt 0 ]; do
@@ -45,6 +48,9 @@ while [ $# -gt 0 ]; do
     ;;
   --skip-prune)
     SKIP_PRUNE=true
+    ;;
+  --skip-update-check)
+    SKIP_UPDATE_CHECK=true
     ;;
   --trunk)
     shift
@@ -228,6 +234,33 @@ if "$REBASE_ALL"; then
     git checkout "${trunk_branch}"
     echo
     green "Finished rebasing!"
+fi
+
+if ! "$SKIP_UPDATE_CHECK"; then
+    echo
+    cyan "Checking if there are updates available for 'gh-tidy'..."
+    # https://stackoverflow.com/questions/3466166/how-to-check-if-running-in-cygwin-mac-or-linux
+    unameOut="$(uname -s)"
+    case "${unameOut}" in
+        Linux*)     machine=Linux;;
+        Darwin*)    machine=Mac;;
+        CYGWIN*)    machine=Cygwin;;
+        *)          machine="UNSUPPORTED"
+    esac
+    if [ "${machine}" == "Mac" ]; then
+        # https://stackoverflow.com/questions/11337041/force-line-buffering-of-stdout-in-a-pipeline/11337109#11337109
+        script -q /dev/null gh extension upgrade HaywardMorihara/gh-tidy --dry-run | grep "would have upgraded from" && \
+        echo "Upgrade by running: " && \
+        yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
+        || green "No available updates found"
+    fi
+    if [ "${machine}" == "Linux" ]; then
+        # https://stackoverflow.com/questions/11337041/force-line-buffering-of-stdout-in-a-pipeline/11337109#11337109
+        script -q -c "gh extension upgrade HaywardMorihara/gh-tidy --dry-run" /dev/null | grep "would have upgraded from" && \
+        echo "Upgrade by running: " && \
+        yellow "    gh extension upgrade HaywardMorihara/gh-tidy" \
+        || green "No available updates found"
+    fi
 fi
 
 echo
