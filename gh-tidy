@@ -23,7 +23,7 @@ Options:
     --skip-update-check
 	Skips checking for updates to gh-tidy extension
     --trunk branch-name
-        Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+    Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
 
 Environment Variables:
     GH_TIDY_REBASE_ALL      Set to 'true' to rebase all branches (same as --rebase-all)
