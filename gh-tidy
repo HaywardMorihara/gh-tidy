@@ -23,17 +23,44 @@ Options:
     --skip-update-check
 	Skips checking for updates to gh-tidy extension
     --trunk branch-name
-    Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+        Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+
+Environment Variables:
+    GH_TIDY_REBASE_ALL      Set to 'true' to rebase all branches (same as --rebase-all)
+    GH_TIDY_SKIP_GC         Set to 'true' to skip git gc (same as --skip-gc)
+    GH_TIDY_SKIP_PRUNE      Set to 'true' to skip git fetch --prune (same as --skip-prune)
+    GH_TIDY_SKIP_UPDATE_CHECK  Set to 'true' to skip update check (same as --skip-update-check)
+    GH_TIDY_TRUNK_BRANCH    Set trunk branch name (same as --trunk)
+
+Note: CLI flags override environment variables. Boolean values accept: 1/true/yes/on or 0/false/no/off
 EOF
 }
 
-# TODO I don't _love_ how there's a mix of additive/subtractive flags...
-REBASE_ALL=false
-SKIP_GC=false
-SKIP_PRUNE=false
-SKIP_UPDATE_CHECK=false
-TRUNK_BRANCH_PARAM=''
+# Helper function to convert string values to boolean
+to_bool() {
+  local val="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$val" in
+    1|true|yes|on) echo true ;;
+    0|false|no|off|"") echo false ;;
+    *) echo false ;;
+  esac
+}
 
+# Default values
+REBASE_ALL_DEFAULT=false
+SKIP_GC_DEFAULT=false
+SKIP_PRUNE_DEFAULT=false
+SKIP_UPDATE_CHECK_DEFAULT=false
+TRUNK_BRANCH_DEFAULT=""
+
+# Initialize from environment variables if set, otherwise use defaults
+REBASE_ALL=$(to_bool "${GH_TIDY_REBASE_ALL:-$REBASE_ALL_DEFAULT}")
+SKIP_GC=$(to_bool "${GH_TIDY_SKIP_GC:-$SKIP_GC_DEFAULT}")
+SKIP_PRUNE=$(to_bool "${GH_TIDY_SKIP_PRUNE:-$SKIP_PRUNE_DEFAULT}")
+SKIP_UPDATE_CHECK=$(to_bool "${GH_TIDY_SKIP_UPDATE_CHECK:-$SKIP_UPDATE_CHECK_DEFAULT}")
+TRUNK_BRANCH_PARAM="${GH_TIDY_TRUNK_BRANCH:-$TRUNK_BRANCH_DEFAULT}"
+
+# Parse command line arguments (these override environment variables)
 while [ $# -gt 0 ]; do
   case "$1" in
   -h|--help)
