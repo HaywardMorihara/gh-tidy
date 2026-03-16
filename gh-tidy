@@ -271,7 +271,7 @@ if ! "$SKIP_UPDATE_CHECK"; then
     cyan "Checking if there are updates available for 'gh-tidy'..."
     upgrade_output=$(gh extension upgrade HaywardMorihara/gh-tidy --dry-run 2>&1)
     if echo "$upgrade_output" | grep -qE "would have upgraded from|new release"; then
-        echo "$upgrade_output"
+        echo "Upgrade by running:"
         yellow "    gh extension upgrade HaywardMorihara/gh-tidy"
     else
         green "No available updates found"
