@@ -102,7 +102,29 @@ function set_trunk_branch() {
             trunk_branch=${TRUNK_BRANCH_PARAM}
             return
         else
-            yellow "WARNING: Specified trunk branch '${TRUNK_BRANCH_PARAM}' not found - defaulting to 'master' or 'main'"
+            yellow "WARNING: Specified trunk branch '${TRUNK_BRANCH_PARAM}' not found - falling back to auto-detection"
+        fi
+    fi
+
+    # Try to detect the default branch from the remote HEAD
+    local remote_head=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [[ ! -z ${remote_head} ]]; then
+        local remote_head_local=$(git branch --list ${remote_head})
+        if [[ ! -z ${remote_head_local} ]]; then
+            trunk_branch="${remote_head}"
+            return
+        fi
+    fi
+
+    # Try using GitHub CLI to get the default branch
+    if command -v gh &>/dev/null; then
+        local gh_default=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null)
+        if [[ ! -z ${gh_default} ]]; then
+            local gh_default_local=$(git branch --list ${gh_default})
+            if [[ ! -z ${gh_default_local} ]]; then
+                trunk_branch="${gh_default}"
+                return
+            fi
         fi
     fi
 
