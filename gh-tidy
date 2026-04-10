@@ -116,7 +116,7 @@ function set_trunk_branch() {
         fi
     fi
 
-    # Try using GitHub CLI to get the default branch
+    # To account for non-standard master / main trunk branches, try using GitHub CLI to get the default branch
     if command -v gh &>/dev/null; then
         local gh_default=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null)
         if [[ ! -z ${gh_default} ]]; then
