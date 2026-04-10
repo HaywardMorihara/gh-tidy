@@ -106,7 +106,7 @@ function set_trunk_branch() {
         fi
     fi
 
-    # Try to detect the default branch from the remote HEAD
+    # To account for non-standard master / main trunk branches, try to detect the default branch from the remote HEAD
     local remote_head=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
     if [[ ! -z ${remote_head} ]]; then
         local remote_head_local=$(git branch --list ${remote_head})
