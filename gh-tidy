@@ -216,10 +216,11 @@ function branch_exists_locally() {
 # main worktree).  Git refuses to delete or checkout these branches, so we skip
 # them rather than prompting the user for an operation that will always fail.
 function get_worktree_branches() {
-    git worktree list --porcelain 2>/dev/null \
-        | grep '^branch ' \
-        | sed 's|^branch refs/heads/||' \
-        | tail -n +2  # skip the first entry, which is the main worktree
+  git worktree list --porcelain 2>/dev/null \
+    | awk '
+        /^$/ { found_first_separator = 1 }
+        found_first_separator && /^branch / { sub("^branch refs/heads/", ""); print }
+      '
 }
 
 worktree_branches=$(get_worktree_branches)
