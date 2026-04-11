@@ -212,6 +212,24 @@ function branch_exists_locally() {
     fi
 }
 
+# Build a set of branches currently checked out in a worktree (other than the
+# main worktree).  Git refuses to delete or checkout these branches, so we skip
+# them rather than prompting the user for an operation that will always fail.
+function get_worktree_branches() {
+    git worktree list --porcelain 2>/dev/null \
+        | grep '^branch ' \
+        | sed 's|^branch refs/heads/||' \
+        | tail -n +2  # skip the first entry, which is the main worktree
+}
+
+worktree_branches=$(get_worktree_branches)
+
+# Function to check if a branch is currently attached to a worktree
+function is_worktree_branch() {
+    local branch="$1"
+    echo "$worktree_branches" | grep -qx "$branch"
+}
+
 # Function to check if the branch (specified as an argument) can be deleted
 function can_delete_branch() {
     local branch="$1"
@@ -219,8 +237,10 @@ function can_delete_branch() {
         return 1  # Branch is equal to trunk_branch, return false
     elif ! branch_exists_locally "$branch"; then
         return 1  # Branch does not exist locally, return false
+    elif is_worktree_branch "$branch"; then
+        return 1  # Branch is checked out in another worktree, return false
     else
-        return 0  # Branch exists locally, return true
+        return 0  # Branch exists locally and is not in use, return true
     fi
 }
 
@@ -268,6 +288,10 @@ if "$REBASE_ALL"; then
     # https://stackoverflow.com/questions/3846380/how-to-iterate-through-all-git-branches-using-bash-script
     for branch in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
         echo
+        if is_worktree_branch "$branch"; then
+            yellow "Skipping rebase of '${branch}' (checked out in another worktree)."
+            continue
+        fi
         cyan "Rebasing ${branch}..."
         git checkout "${branch}"
         { git rebase "${trunk_branch}" && green "Successfully rebase ${branch}!"; } || \
