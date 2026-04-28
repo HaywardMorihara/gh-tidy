@@ -66,6 +66,7 @@ SKIP_UPDATE_CHECK=$(to_bool "${GH_TIDY_SKIP_UPDATE_CHECK:-$SKIP_UPDATE_CHECK_DEF
 TRUNK_BRANCH_PARAM="${GH_TIDY_TRUNK_BRANCH:-$TRUNK_BRANCH_DEFAULT}"
 
 # Parse command line arguments (these override environment variables)
+# TODO: if more skip/auto flags accumulate, consider a single --non-interactive flag instead.
 while [ $# -gt 0 ]; do
   case "$1" in
   -h|--help)
@@ -76,7 +77,6 @@ while [ $# -gt 0 ]; do
     REBASE_ALL=true
     ;;
   --auto-delete-merged)
-    # If more flags like this accumulate, consider consolidating under a single --non-interactive flag.
     AUTO_DELETE_MERGED=true
     ;;
   --skip-gc)
@@ -131,6 +131,7 @@ if "$AUTO_DELETE_MERGED"; then yellow "AUTO_DELETE_MERGED is enabled (merged bra
 if "$SKIP_GC"; then yellow "SKIP_GC is enabled (skipping git gc)"; fi
 if "$SKIP_PRUNE"; then yellow "SKIP_PRUNE is enabled (skipping git fetch --prune)"; fi
 if "$SKIP_UPDATE_CHECK"; then yellow "SKIP_UPDATE_CHECK is enabled (skipping gh-tidy update check)"; fi
+if [[ -n "$TRUNK_BRANCH_PARAM" ]]; then yellow "TRUNK_BRANCH is set to '${TRUNK_BRANCH_PARAM}'"; fi
 
 echo
 # https://stackoverflow.com/questions/35978550/how-to-show-uncommitted-changes-in-git-and-some-git-diffs-in-detail
@@ -266,10 +267,10 @@ cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
 for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)'); do
     if can_delete_branch "$branch"; then
         if "$AUTO_DELETE_MERGED"; then
-            yellow "Auto-deleting branch '${branch}' (merged into $trunk_branch)."
+            yellow "Auto-deleting branch '${branch}' (merged into $trunk_branch)"
             git branch -D "${branch}" || true
         else
-            read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[93m' -n 1 -r
+            read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[0m' -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 git branch -D "${branch}" || true
@@ -291,7 +292,7 @@ for branch in $(git branch --format='%(refname:short)'); do
         merged_branch=$(gh pr list --author @me --state merged --limit 1 --search "head:$branch" --json headRefName --jq '.[].headRefName')
         if [ -n "${merged_branch}" ] && [ "${merged_branch}" == "${branch}" ]; then
             if "$AUTO_DELETE_MERGED"; then
-                yellow "Auto-deleting branch '${merged_branch}' (PR merged on GitHub)."
+                yellow "Auto-deleting branch '${merged_branch}' (PR merged on GitHub)"
                 git branch -D "${merged_branch}" || true
             else
                 read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
