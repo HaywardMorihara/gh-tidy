@@ -264,7 +264,7 @@ function can_delete_branch() {
 
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
-for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)'); do
+while IFS= read -r branch; do
     if can_delete_branch "$branch"; then
         if "$AUTO_DELETE_MERGED"; then
             yellow "Auto-deleting branch '${branch}' (merged into $trunk_branch)"
@@ -279,14 +279,14 @@ for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)')
     else
         green "Skipping deletion of branch '$branch'."
     fi
-done
+done < <(git branch --merged "$trunk_branch" --format='%(refname:short)')
 green "Complete!"
 # TODO Message if none found
 
 # Covers branches that get squashed & merged
 echo
 cyan "Pruning YOUR local branches that have had their pull requests merged on Github..."
-for branch in $(git branch --format='%(refname:short)'); do
+while IFS= read -r branch; do
     # TODO Make this work with collaborative branches where you aren't the author
     if can_delete_branch "$branch"; then
         merged_branch=$(gh pr list --author @me --state merged --limit 1 --search "head:$branch" --json headRefName --jq '.[].headRefName')
@@ -305,7 +305,7 @@ for branch in $(git branch --format='%(refname:short)'); do
     else
         green "Skipping deletion of branch '$branch'."
     fi
-done
+done < <(git branch --format='%(refname:short)')
 green "Complete!"
 # TODO Message if none found
 
@@ -314,7 +314,7 @@ if "$REBASE_ALL"; then
     echo
     cyan "Rebasing ALL local branches on to latest master..."
     # https://stackoverflow.com/questions/3846380/how-to-iterate-through-all-git-branches-using-bash-script
-    for branch in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
+    while IFS= read -r branch; do
         echo
         if is_worktree_branch "$branch"; then
             yellow "Skipping rebase of '${branch}' (checked out in another worktree)."
@@ -324,7 +324,7 @@ if "$REBASE_ALL"; then
         git checkout "${branch}"
         { git rebase "${trunk_branch}" && green "Successfully rebased ${branch}!"; } || \
         { git rebase --abort && problem_branches+=("${branch}") && yellow "WARNING: Problem rebasing ${branch}"; }
-    done
+    done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
     git checkout "${trunk_branch}"
     echo
     green "Finished rebasing!"
