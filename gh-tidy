@@ -23,7 +23,7 @@ Options:
     --skip-update-check
 	Skips checking for updates to gh-tidy extension
     --trunk branch-name
-    Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
+	Specifies the trunk branch to use (default: 'master' or 'main' if 'master' doesn't exist)
 
 Environment Variables:
     GH_TIDY_REBASE_ALL         Set to 'true' to rebase all branches (same as --rebase-all)
@@ -129,9 +129,9 @@ else
 fi
 
 function set_trunk_branch() {
-    if [[ ! -z ${TRUNK_BRANCH_PARAM} ]]; then
-        local user_trunk_branch=$(git branch --list ${TRUNK_BRANCH_PARAM})
-        if [[ ! -z ${user_trunk_branch} ]]; then
+    if [[ -n "${TRUNK_BRANCH_PARAM}" ]]; then
+        local user_trunk_branch=$(git branch --list "${TRUNK_BRANCH_PARAM}")
+        if [[ -n "${user_trunk_branch}" ]]; then
             trunk_branch=${TRUNK_BRANCH_PARAM}
             return
         else
@@ -141,9 +141,9 @@ function set_trunk_branch() {
 
     # To account for non-standard master / main trunk branches, try to detect the default branch from the remote HEAD
     local remote_head=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-    if [[ ! -z ${remote_head} ]]; then
-        local remote_head_local=$(git branch --list ${remote_head})
-        if [[ ! -z ${remote_head_local} ]]; then
+    if [[ -n "${remote_head}" ]]; then
+        local remote_head_local=$(git branch --list "${remote_head}")
+        if [[ -n "${remote_head_local}" ]]; then
             trunk_branch="${remote_head}"
             return
         fi
@@ -152,9 +152,9 @@ function set_trunk_branch() {
     # To account for non-standard master / main trunk branches, try using GitHub CLI to get the default branch
     if command -v gh &>/dev/null; then
         local gh_default=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null)
-        if [[ ! -z ${gh_default} ]]; then
-            local gh_default_local=$(git branch --list ${gh_default})
-            if [[ ! -z ${gh_default_local} ]]; then
+        if [[ -n "${gh_default}" ]]; then
+            local gh_default_local=$(git branch --list "${gh_default}")
+            if [[ -n "${gh_default_local}" ]]; then
                 trunk_branch="${gh_default}"
                 return
             fi
@@ -162,13 +162,13 @@ function set_trunk_branch() {
     fi
 
     local master_branch=$(git branch --list master)
-    if [[ ! -z ${master_branch} ]]; then
+    if [[ -n "${master_branch}" ]]; then
         trunk_branch="master"
         return
     fi
 
     local main_branch=$(git branch --list main)
-    if [[ ! -z ${main_branch} ]]; then
+    if [[ -n "${main_branch}" ]]; then
         trunk_branch="main"
         return
     fi
