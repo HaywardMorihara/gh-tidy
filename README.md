@@ -30,6 +30,33 @@ and it will checkout master/main, pull the latest, and clean up branches for you
 
 If your repo doesn't _have_ a master/main branch, you can specify your trunk branch with the `--trunk <branchname>` parameter
 
+### Non-interactive use
+
+For cron jobs, CI runners, post-merge git hooks, and other non-interactive contexts where the
+interactive `(y/n)` prompts would hang, pass `--auto-delete-merged`:
+
+```sh
+gh tidy --auto-delete-merged --skip-update-check --skip-gc
+```
+
+Or set the environment variable to keep your scripts flag-free:
+
+```sh
+export GH_TIDY_AUTO_DELETE_MERGED=true
+gh tidy
+```
+
+Example post-merge hook (`.git/hooks/post-merge`):
+
+```sh
+#!/usr/bin/env bash
+GH_TIDY_AUTO_DELETE_MERGED=true gh tidy --skip-update-check --skip-gc
+```
+
+Merged branches are still protected by the same safety checks as interactive mode: trunk
+branches, branches missing locally, and branches checked out in another worktree are never
+deleted.
+
 ## Troubleshooting
 If you get an error such as:
 ```sh
