@@ -90,6 +90,10 @@ while [ $# -gt 0 ]; do
     ;;
   --trunk)
     shift
+    if [[ -z "$1" || "$1" == --* ]]; then
+      echo "Error: --trunk requires a branch name argument" >&2
+      exit 1
+    fi
     TRUNK_BRANCH_PARAM=$1
     ;;
   esac
@@ -222,11 +226,7 @@ fi
 # Function to check if a branch exists locally
 function branch_exists_locally() {
     local branch="$1"
-    if git branch --list "$branch" >/dev/null 2>&1; then
-        return 0
-    else
-        return 1
-    fi
+    [[ -n "$(git branch --list "$branch")" ]]
 }
 
 # Build a set of branches currently checked out in a worktree (other than the
@@ -270,7 +270,7 @@ for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)')
             yellow "Auto-deleting branch '${branch}' (merged into $trunk_branch)"
             git branch -D "${branch}" || true
         else
-            read -p $'\e[93m'"Branch ${branch} is the same as local $trunk_branch - delete it? (y/n) "$'\e[0m' -n 1 -r
+            read -p $'\e[93m'"Branch ${branch} is merged into $trunk_branch - delete it? (y/n) "$'\e[0m' -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 git branch -D "${branch}" || true
@@ -309,8 +309,8 @@ done
 green "Complete!"
 # TODO Message if none found
 
+problem_branches=()
 if "$REBASE_ALL"; then
-    problem_branches=()
     echo
     cyan "Rebasing ALL local branches on to latest master..."
     # https://stackoverflow.com/questions/3846380/how-to-iterate-through-all-git-branches-using-bash-script
@@ -322,7 +322,7 @@ if "$REBASE_ALL"; then
         fi
         cyan "Rebasing ${branch}..."
         git checkout "${branch}"
-        { git rebase "${trunk_branch}" && green "Successfully rebase ${branch}!"; } || \
+        { git rebase "${trunk_branch}" && green "Successfully rebased ${branch}!"; } || \
         { git rebase --abort && problem_branches+=("${branch}") && yellow "WARNING: Problem rebasing ${branch}"; }
     done
     git checkout "${trunk_branch}"
