@@ -195,6 +195,7 @@ function set_trunk_branch() {
     fi
 
     red "No trunk branch found; specify one with the --trunk <branch-name> flag"
+    exit 1
 }
 
 set_trunk_branch
