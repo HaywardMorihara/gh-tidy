@@ -12,12 +12,14 @@ Tidies your work space!
     * Runs 'git gc' to clean up unnecessary files & optimize your local repo
     * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
     * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+    * Safely removes clean worktrees whose HEAD has landed, along with their branches
+    * Prunes worktrees whose directories are gone, and asks about locked ones that pruning can't reach
 
 Options:
     --rebase-all
 	Rebases all your local branches to the latest master.
     --auto-delete-merged
-	Automatically delete merged branches without prompting (for non-interactive use, e.g. cron, CI, post-merge hooks).
+	Automatically delete merged branches and landed worktrees without prompting (for non-interactive use, e.g. cron, CI, post-merge hooks).
     --skip-gc
 	Skips the 'git gc' step (which executes by default)
     --skip-prune
@@ -29,7 +31,7 @@ Options:
 
 Environment Variables:
     GH_TIDY_REBASE_ALL         Set to 'true' to rebase all branches (same as --rebase-all)
-    GH_TIDY_AUTO_DELETE_MERGED Set to 'true' to auto-delete merged branches (same as --auto-delete-merged)
+    GH_TIDY_AUTO_DELETE_MERGED Set to 'true' to auto-delete merged branches & landed worktrees (same as --auto-delete-merged)
     GH_TIDY_SKIP_GC            Set to 'true' to skip git gc (same as --skip-gc)
     GH_TIDY_SKIP_PRUNE         Set to 'true' to skip git fetch --prune (same as --skip-prune)
     GH_TIDY_SKIP_UPDATE_CHECK  Set to 'true' to skip update check (same as --skip-update-check)
@@ -240,6 +242,180 @@ function get_worktree_branches() {
       '
 }
 
+# Every worktree except the main one, as "<path>TAB<branch>TAB<locked>".  A worktree
+# holds its branch hostage - git refuses to delete a checked-out branch - so a
+# worktree whose work has landed keeps a dead branch alive indefinitely.  Locked
+# ones are worse still: a lock (set by an IDE, editor, or backup/sync tool) also
+# excludes them from 'git worktree prune', so they linger even once their directory
+# is gone.  Each entry is only ever removed after proving it clean and landed.
+function get_prunable_worktrees() {
+  git worktree list --porcelain 2>/dev/null \
+    | awk -v OFS='\t' '
+        # The first record is the main worktree, which is never prunable.
+        function flush() {
+            if (path != "" && ++seen > 1) print path, branch, locked
+            path = ""; branch = ""; locked = 0
+        }
+        /^worktree / { flush(); path = substr($0, 10) }
+        /^branch /   { branch = substr($0, 8); sub("^refs/heads/", "", branch) }
+        /^locked/    { locked = 1 }
+        END          { flush() }
+      '
+}
+
+# Has this commit landed on the trunk?  Returns 0 yes, 1 no, 2 couldn't tell.
+# The GitHub lookup is by head commit, not branch name or author, so it also sees
+# squash merges and pull requests opened by someone other than you.
+# `gh api` is not repository-aware the way `gh repo view` is, so on a GitHub
+# Enterprise remote it would query github.com and 404.  Resolve the host from
+# the remote on first use only: it costs a network round-trip, and the ancestor
+# check below settles most commits without ever reaching the API.
+github_host=""
+github_host_resolved=0
+function resolve_github_host() {
+    [[ "$github_host_resolved" == 1 ]] && return
+    github_host_resolved=1
+    github_host=$(gh repo view --json url --jq '.url | capture("^https?://(?<host>[^/]+)").host' 2>/dev/null || true)
+}
+
+function head_is_merged() {
+    local head="$1"
+    git merge-base --is-ancestor "$head" "$trunk_branch" && return 0
+    local merged_heads hostname=()
+    resolve_github_host
+    [[ -z "$github_host" ]] || hostname=(--hostname "$github_host")
+    # Fold stderr in so a failure carries its reason; grep -Fx below needs a
+    # whole-line SHA match, so any stray warning on the success path is inert.
+    if ! merged_heads=$(gh api "${hostname[@]}" --paginate "repos/{owner}/{repo}/commits/$head/pulls" --jq ".[] | select(.merged_at != null and .head.sha == \"$head\") | .head.sha" 2>&1); then
+        # HTTP 422: the server has never seen this commit, so it cannot have
+        # landed through a pull request. That is an answer, not a failure.
+        [[ "$merged_heads" == *"No commit found for SHA"* ]] && return 1
+        return 2
+    fi
+    printf '%s\n' "$merged_heads" | grep -Fx "$head" >/dev/null && return 0
+    return 1
+}
+
+# Unlocking is only valid for a worktree that is actually locked, and a failed
+# removal must leave the lock exactly as it found it.
+function remove_worktree() {
+    local path="$1" locked="$2"
+    if [[ "$locked" == "1" ]] && ! git worktree unlock "$path"; then
+        red "Unable to unlock locked worktree '$path'."
+        return 1
+    fi
+    if git worktree remove "$path"; then
+        green "Removed worktree '$path'."
+        return 0
+    fi
+    if [[ "$locked" == "1" ]]; then
+        red "Unable to remove worktree '$path'; restoring its lock."
+        git worktree lock "$path" || red "Unable to restore lock for '$path'."
+    else
+        red "Unable to remove worktree '$path'."
+    fi
+    return 1
+}
+
+# Ask a yes/no question, answering "no" when there's nothing to ask on.  A bare
+# 'read' with no terminal returns non-zero at EOF, which under 'set -e' takes the
+# whole script down mid-run - so check for a terminal rather than prompting blind.
+function confirm() {
+    local prompt="$1"
+    if [[ ! -t 0 ]]; then
+        yellow "Not interactive, skipping (use --auto-delete-merged): ${prompt}"
+        return 1
+    fi
+    read -p $'\e[93m'"${prompt} (y/n) "$'\e[0m' -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+# Removing a worktree leaves its branch behind.  We already proved the branch's
+# HEAD landed to justify the removal, so delete it here rather than let the branch
+# passes below re-derive it - 'git branch --merged' misses a squash merge, and the
+# pull request pass only looks at branches you authored.
+function delete_landed_branch() {
+    local branch="$1"
+    [[ -n "$branch" ]] || return 0
+    branch_exists_locally "$branch" || return 0
+    [[ "$branch" != "$trunk_branch" ]] || return 0
+    if "$AUTO_DELETE_MERGED"; then
+        yellow "Auto-deleting branch '${branch}' (worktree removed, HEAD landed)"
+        git branch -D "$branch" || true
+    elif confirm "Branch ${branch} is landed and its worktree is gone - delete it?"; then
+        git branch -D "$branch" || true
+    fi
+}
+
+echo
+cyan "Checking for worktrees whose work has already landed..."
+# Clear the administrative files left behind by worktrees whose directories are
+# gone.  This skips locked worktrees by design, which is why the loop below still
+# has to handle a missing directory itself.  Not gated on --skip-prune: that flag
+# is about the 'git fetch --prune' network round-trip, and this is purely local.
+git worktree prune -v
+# Fed on fd 3, not stdin: a plain '< <(...)' would make the worktree list the loop's
+# stdin, so the 'read -p' prompt below would silently eat list entries instead of
+# asking the user.
+while IFS=$'\t' read -r -u 3 worktree_path worktree_branch worktree_locked; do
+    [[ -n "$worktree_path" ]] || continue
+    if [[ -d "$worktree_path" ]]; then
+        if [[ -z "$worktree_branch" ]]; then
+            yellow "Keeping worktree '$worktree_path' (no branch checked out)."
+            continue
+        fi
+        if ! worktree_branch=$(git -C "$worktree_path" symbolic-ref --quiet --short HEAD); then
+            yellow "Keeping worktree '$worktree_path' (detached or unverifiable branch)."
+            continue
+        fi
+        if ! worktree_head=$(git -C "$worktree_path" rev-parse --verify HEAD 2>/dev/null); then
+            yellow "Keeping worktree '$worktree_path' (unverifiable HEAD)."
+            continue
+        fi
+        if ! worktree_status=$(git -C "$worktree_path" status --porcelain --untracked-files=all 2>/dev/null); then
+            yellow "Keeping worktree '$worktree_path' (unable to inspect status)."
+            continue
+        elif [[ -n "$worktree_status" ]]; then
+            yellow "Keeping worktree '$worktree_path' (dirty)."
+            continue
+        fi
+        head_is_merged "$worktree_head" && merge_check=0 || merge_check=$?
+        if [[ $merge_check -eq 2 ]]; then
+            yellow "Keeping worktree '$worktree_path' (GitHub lookup failed; HEAD is unverifiable)."
+            continue
+        elif [[ $merge_check -ne 0 ]]; then
+            yellow "Keeping worktree '$worktree_path' (HEAD is not landed)."
+            continue
+        fi
+        if "$AUTO_DELETE_MERGED"; then
+            yellow "Auto-removing worktree '$worktree_path' (clean, landed HEAD)"
+            { remove_worktree "$worktree_path" "$worktree_locked" && delete_landed_branch "$worktree_branch"; } || true
+        elif confirm "Worktree ${worktree_path} is clean with a landed HEAD - remove it?"; then
+            { remove_worktree "$worktree_path" "$worktree_locked" && delete_landed_branch "$worktree_branch"; } || true
+        fi
+        continue
+    fi
+    # An unlocked worktree with no directory is already handled by 'git worktree
+    # prune'; only a locked one lingers, and it needs an explicit decision because
+    # its contents can no longer be inspected.
+    [[ "$worktree_locked" == "1" ]] || continue
+    if "$AUTO_DELETE_MERGED"; then
+        yellow "Skipping locked worktree '$worktree_path' (directory is gone; contents cannot be inspected)."
+        continue
+    fi
+    if [[ -z "$worktree_branch" ]]; then
+        merge_status="no branch checked out"
+    else
+        merge_status="branch '$worktree_branch' cannot be verified because its directory is gone"
+    fi
+    if ! confirm "Worktree ${worktree_path} is locked but its directory is gone (${merge_status}) - remove it?"; then
+        continue
+    fi
+    remove_worktree "$worktree_path" "$worktree_locked" || true
+done 3< <(get_prunable_worktrees)
+green "Complete!"
+
 worktree_branches=$(get_worktree_branches)
 
 # Function to check if a branch is currently attached to a worktree
@@ -265,45 +441,50 @@ function can_delete_branch() {
 echo
 cyan "Pruning local branches that show as 'merged' to local $trunk_branch..."
 for branch in $(git branch --merged "$trunk_branch" --format='%(refname:short)'); do
+    [[ "$branch" != "$trunk_branch" ]] || continue
     if can_delete_branch "$branch"; then
         if "$AUTO_DELETE_MERGED"; then
             yellow "Auto-deleting branch '${branch}' (merged into $trunk_branch)"
             git branch -D "${branch}" || true
         else
-            read -p $'\e[93m'"Branch ${branch} is merged into $trunk_branch - delete it? (y/n) "$'\e[0m' -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if confirm "Branch ${branch} is merged into $trunk_branch - delete it?"; then
                 git branch -D "${branch}" || true
             fi
         fi
     else
-        green "Skipping deletion of branch '$branch'."
+        green "Skipping branch '$branch' (checked out in a worktree)."
     fi
 done
 green "Complete!"
 # TODO Message if none found
 
-# Covers branches that get squashed & merged
+# Covers branches that get squashed & merged.  Matching on the head commit rather
+# than on 'gh pr list --author @me' also catches branches off pull requests you did
+# not author - a review/* or integrate/* branch lands as someone else's squash
+# commit, so the author filter and 'git branch --merged' above both miss it.
 echo
-cyan "Pruning YOUR local branches that have had their pull requests merged on Github..."
+cyan "Pruning local branches that have had their pull requests merged on Github..."
 for branch in $(git branch --format='%(refname:short)'); do
-    # TODO Make this work with collaborative branches where you aren't the author
-    if can_delete_branch "$branch"; then
-        merged_branch=$(gh pr list --author @me --state merged --limit 1 --search "head:$branch" --json headRefName --jq '.[].headRefName')
-        if [ -n "${merged_branch}" ] && [ "${merged_branch}" == "${branch}" ]; then
-            if "$AUTO_DELETE_MERGED"; then
-                yellow "Auto-deleting branch '${merged_branch}' (PR merged on GitHub)"
-                git branch -D "${merged_branch}" || true
-            else
-                read -p $'\e[93m'"Branch ${merged_branch} has been merged - delete it? (y/n) "$'\e[0m' -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    git branch -D "${merged_branch}" || true
-                fi
-            fi
-        fi
+    [[ "$branch" != "$trunk_branch" ]] || continue
+    if ! can_delete_branch "$branch"; then
+        green "Skipping branch '$branch' (checked out in a worktree)."
+        continue
+    fi
+    branch_head=$(git rev-parse --verify "$branch" 2>/dev/null) || continue
+    head_is_merged "$branch_head" && merge_check=0 || merge_check=$?
+    if [[ $merge_check -eq 2 ]]; then
+        yellow "Skipping branch '$branch' (GitHub lookup failed; cannot confirm it landed)."
+        continue
+    elif [[ $merge_check -ne 0 ]]; then
+        continue
+    fi
+    if "$AUTO_DELETE_MERGED"; then
+        yellow "Auto-deleting branch '${branch}' (PR merged on GitHub)"
+        git branch -D "${branch}" || true
     else
-        green "Skipping deletion of branch '$branch'."
+        if confirm "Branch ${branch} has been merged - delete it?"; then
+            git branch -D "${branch}" || true
+        fi
     fi
 done
 green "Complete!"

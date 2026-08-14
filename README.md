@@ -9,6 +9,7 @@
 * Runs 'git gc' to clean up unnecessary files & optimize your local repo
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
+* Checks locked worktrees safely. Existing worktrees are offered for removal only when clean and landed; missing locked worktrees remain an interactive cleanup task. Automatic mode leaves missing, dirty, detached, unlanded, and unverifiable worktrees intact. Removing a worktree never deletes its branch, so later branch-pruning steps decide that separately
 * If flagged, rebases all your local branches to the latest master
 
 ## Installation
