@@ -9,7 +9,7 @@
 * Runs 'git gc' to clean up unnecessary files & optimize your local repo
 * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
 * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
-* Checks locked worktrees safely. Existing worktrees are offered for removal only when clean and landed; missing locked worktrees remain an interactive cleanup task. Automatic mode leaves missing, dirty, detached, unlanded, and unverifiable worktrees intact. Removing a worktree never deletes its branch, so later branch-pruning steps decide that separately
+* Checks your worktrees for ones whose HEAD has landed (it's in master, or it's the head of a merged pull request), and asks for your permission to remove them along with their branches. Uncommitted changes in such a worktree are saved first rather than deleted, each set to a `refs/gh-tidy/leftovers/<branch>/<id>` ref: `git for-each-ref refs/gh-tidy` lists them, `git stash apply <ref>` restores one, and `git update-ref -d <ref>` deletes one, since they are kept until you do. Ignored files (build output, `.env`, `node_modules`) are not saved, and go with the worktree as they always have. Detached, unlanded, and unverifiable worktrees are left intact, and a locked worktree whose directory is gone is only removed when you confirm it
 * If flagged, rebases all your local branches to the latest master
 
 ## Installation

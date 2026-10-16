@@ -61,23 +61,53 @@ assert_exists "$repo"
 assert_no_branch "$repo" topic
 assert_branch "$repo" main
 
+# A landed worktree with uncommitted changes goes too, once they are saved - on a ref
+# of their own, so the user's stash is left exactly as it was.
 repo="$tmp/unlocked-dirty"
 worktree="$tmp/unlocked-dirty-worktree"
 make_repo "$repo"
 add_worktree "$repo" "$worktree" topic
-touch "$worktree/dirty"
+echo scratch > "$worktree/untracked"
+echo edit >> "$worktree/README"
+echo mine >> "$repo/README"
+git -C "$repo" stash push -q -m mine
 output=$(run_tidy "$repo")
-assert_exists "$worktree"
-assert_branch "$repo" topic
+assert_missing "$worktree"
+assert_no_branch "$repo" topic
+[[ "$(git -C "$repo" stash list)" == "stash@{0}: On main: mine" ]] || fail "expected the user's stash untouched"
+saved=$(git -C "$repo" for-each-ref --format='%(refname)' refs/gh-tidy/leftovers/topic)
+[[ -n "$saved" ]] || fail "expected the changes saved under refs/gh-tidy/leftovers/topic"
+assert_contains "$output" "git stash apply $saved"
+# The restore command the output gives must bring back both kinds of change.
+git -C "$repo" worktree add -q --detach "$tmp/restored" "$saved^1"
+git -C "$tmp/restored" stash apply -q "$saved"
+assert_contains "$(cat "$tmp/restored/untracked")" scratch
+assert_contains "$(cat "$tmp/restored/README")" edit
 
+# Locked, a slash in the branch name, and a space in the path.
 repo="$tmp/dirty"
-worktree="$tmp/dirty-landed"
+worktree="$tmp/dirty landed"
 make_repo "$repo"
-add_locked_worktree "$repo" "$worktree" topic
+add_locked_worktree "$repo" "$worktree" feat/dirty
 touch "$worktree/dirty"
 output=$(run_tidy "$repo")
-assert_exists "$worktree"
-assert_contains "$output" "dirty"
+assert_missing "$worktree"
+assert_no_branch "$repo" feat/dirty
+assert_contains "$output" "?? dirty"
+[[ -n "$(git -C "$repo" for-each-ref refs/gh-tidy/leftovers/feat/dirty)" ]] || fail "expected the changes saved"
+
+# Without --auto-delete-merged and no terminal to ask on, nothing is saved or removed.
+repo="$tmp/not-interactive"
+worktree="$tmp/not-interactive-worktree"
+make_repo "$repo"
+add_worktree "$repo" "$worktree" topic
+touch "$worktree/scratch"
+output=$(cd "$repo" && GH_TIDY_DEV_MODE=true GH_TIDY_AUTO_DELETE_MERGED=false "$script_dir/gh-tidy" \
+  --skip-gc --skip-prune --skip-update-check --trunk main </dev/null 2>&1)
+assert_contains "$output" "Not interactive, skipping"
+[[ -e "$worktree/scratch" ]] || fail "expected the worktree and its untracked file to survive"
+assert_branch "$repo" topic
+[[ -z "$(git -C "$repo" for-each-ref refs/gh-tidy)" ]] || fail "expected nothing saved without consent"
 
 repo="$tmp/unlanded"
 worktree="$tmp/unlanded-worktree"
@@ -86,13 +116,15 @@ add_locked_worktree "$repo" "$worktree" topic
 touch "$worktree/unlanded"
 git -C "$worktree" add unlanded
 git -C "$worktree" commit -qm unlanded
+touch "$worktree/scratch"
 gh() { return 0; }
 export -f gh
 output=$(run_tidy "$repo")
 unset -f gh
 assert_exists "$worktree"
 assert_contains "$output" "not landed"
-# Clean but unlanded: neither the worktree nor its branch may be touched.
+# Unlanded: neither the worktree, its uncommitted changes, nor its branch may be touched.
+[[ -e "$worktree/scratch" ]] || fail "expected the unlanded worktree's untracked file to survive"
 assert_branch "$repo" topic
 
 repo="$tmp/lookup-failure"
@@ -199,8 +231,32 @@ git -C "$repo" -c protocol.file.allow=always submodule add -q "$submodule" vendo
 git -C "$repo" commit -qm 'add submodule'
 add_locked_worktree "$repo" "$worktree" topic
 git -C "$worktree" -c protocol.file.allow=always submodule update --init -q
+echo keep > "$worktree/scratch"
+git -C "$worktree" add scratch
 output=$(run_tidy "$repo" || true)
 assert_contains "$(git -C "$repo" worktree list --porcelain)" "locked"
 assert_contains "$output" "Unable to remove worktree"
+# The removal failed, so the changes saved for it must be back where they were, staged
+# ones included.
+assert_contains "$(cat "$worktree/scratch")" keep
+assert_contains "$(git -C "$worktree" diff --cached --name-only)" scratch
+[[ -z "$(git -C "$repo" for-each-ref refs/gh-tidy)" ]] || fail "expected no leftovers ref after restoring"
+
+# Only a submodule is dirty: 'stash push' saves nothing yet still exits 0.  The worktree
+# must be kept, and the user's own stash must not be mistaken for the save.
+repo="$tmp/dirty-submodule"
+worktree="$tmp/dirty-submodule-worktree"
+make_repo "$repo"
+git -C "$repo" -c protocol.file.allow=always submodule add -q "$submodule" vendor/submodule
+git -C "$repo" commit -qm 'add submodule'
+add_worktree "$repo" "$worktree" topic
+git -C "$worktree" -c protocol.file.allow=always submodule update --init -q
+echo dirty >> "$worktree/vendor/submodule/README"
+echo mine >> "$repo/README"
+git -C "$repo" stash push -q -m mine
+output=$(run_tidy "$repo")
+assert_contains "$output" "Unable to save"
+assert_contains "$(cat "$worktree/vendor/submodule/README")" dirty
+[[ "$(git -C "$repo" stash list)" == "stash@{0}: On main: mine" ]] || fail "expected the user's stash untouched"
 
 echo "PASS: locked worktree cleanup"
