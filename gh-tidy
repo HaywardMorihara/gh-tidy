@@ -12,14 +12,14 @@ Tidies your work space!
     * Runs 'git gc' to clean up unnecessary files & optimize your local repo
     * Checks your local branches for ones that show as merged to master, and asks for your permission to delete them
     * Checks your local branches for ones that have their corresponding pull requests merged, and asks for your permission to delete them
-    * Safely removes clean worktrees whose HEAD has landed, along with their branches
+    * Removes worktrees whose HEAD has landed, along with their branches, saving any uncommitted changes in them first
     * Prunes worktrees whose directories are gone, and asks about locked ones that pruning can't reach
 
 Options:
     --rebase-all
 	Rebases all your local branches to the latest master.
     --auto-delete-merged
-	Automatically delete merged branches and landed worktrees without prompting (for non-interactive use, e.g. cron, CI, post-merge hooks).
+	Automatically delete merged branches and landed worktrees, saving any uncommitted changes in those worktrees first, without prompting (for non-interactive use, e.g. cron, CI, post-merge hooks).
     --skip-gc
 	Skips the 'git gc' step (which executes by default)
     --skip-prune
@@ -247,7 +247,8 @@ function get_worktree_branches() {
 # worktree whose work has landed keeps a dead branch alive indefinitely.  Locked
 # ones are worse still: a lock (set by an IDE, editor, or backup/sync tool) also
 # excludes them from 'git worktree prune', so they linger even once their directory
-# is gone.  Each entry is only ever removed after proving it clean and landed.
+# is gone.  Each entry is only ever removed after proving it landed and saving any
+# uncommitted changes in it.
 function get_prunable_worktrees() {
   git worktree list --porcelain 2>/dev/null \
     | awk -v OFS='\t' '
@@ -317,6 +318,36 @@ function remove_worktree() {
     return 1
 }
 
+# A landed worktree can still hold uncommitted changes.  They are usually tool output
+# or scratch files, but nothing proves that, so save them rather than delete them.
+# 'stash push' is the one command that captures untracked files too.  The entry then
+# moves to a ref of its own: refs/stash is shared by every worktree, so left on the
+# stack it would be what the user's next 'git stash pop' applies.
+function save_leftovers() {
+    local path="$1" branch="$2" before saved
+    before=$(git rev-parse -q --verify refs/stash) || before=""
+    git -C "$path" stash push --include-untracked --quiet -m "gh-tidy: leftovers from $path" || return 1
+    # 'stash push' exits 0 without saving anything when, say, only a submodule is dirty.
+    # shortcut: a stash pushed elsewhere between that push and this rev-parse would be taken
+    # for ours (git has no atomic push-and-report); revisit if concurrent stashing ever bites.
+    saved=$(git rev-parse -q --verify refs/stash) && [[ "$saved" != "$before" ]] || return 1
+    leftovers_ref="refs/gh-tidy/leftovers/$branch/$(git rev-parse --short "$saved")"
+    if ! git update-ref "$leftovers_ref" "$saved"; then
+        { git -C "$path" stash apply --index --quiet "$saved" && drop_stash "$saved"; } \
+            || red "Unable to put back the uncommitted changes in '$path'; they are in 'git stash list'."
+        return 1
+    fi
+    drop_stash "$saved" || yellow "WARNING: Unable to drop the saved changes from 'git stash list'; drop them by hand."
+}
+
+# Drop a stash entry by its commit rather than as stash@{0}: another worktree may have
+# pushed on top of it since.
+function drop_stash() {
+    local n
+    n=$(git stash list --format=%H | grep -nxF "$1" | head -n 1 | cut -d: -f1)
+    [[ -n "$n" ]] && git stash drop --quiet "stash@{$((n - 1))}"
+}
+
 # Ask a yes/no question, answering "no" when there's nothing to ask on.  A bare
 # 'read' with no terminal returns non-zero at EOF, which under 'set -e' takes the
 # whole script down mid-run - so check for a terminal rather than prompting blind.
@@ -373,13 +404,8 @@ while IFS=$'\t' read -r -u 3 worktree_path worktree_branch worktree_locked; do
             yellow "Keeping worktree '$worktree_path' (unverifiable HEAD)."
             continue
         fi
-        if ! worktree_status=$(git -C "$worktree_path" status --porcelain --untracked-files=all 2>/dev/null); then
-            yellow "Keeping worktree '$worktree_path' (unable to inspect status)."
-            continue
-        elif [[ -n "$worktree_status" ]]; then
-            yellow "Keeping worktree '$worktree_path' (dirty)."
-            continue
-        fi
+        # Landed first: uncommitted changes in a landed worktree are saved, not a reason
+        # to keep it, and an unlanded one is kept whatever its state.
         head_is_merged "$worktree_head" && merge_check=0 || merge_check=$?
         if [[ $merge_check -eq 2 ]]; then
             yellow "Keeping worktree '$worktree_path' (GitHub lookup failed; HEAD is unverifiable)."
@@ -388,11 +414,34 @@ while IFS=$'\t' read -r -u 3 worktree_path worktree_branch worktree_locked; do
             yellow "Keeping worktree '$worktree_path' (HEAD is not landed)."
             continue
         fi
+        if ! worktree_status=$(git -C "$worktree_path" status --porcelain --untracked-files=all 2>/dev/null); then
+            yellow "Keeping worktree '$worktree_path' (unable to inspect status)."
+            continue
+        fi
+        if [[ -z "$worktree_status" ]]; then
+            removal_reason="clean, landed HEAD"
+            removal_prompt="Worktree ${worktree_path} is clean with a landed HEAD - remove it?"
+        else
+            git -C "$worktree_path" status --short | sed 's/^/    /'
+            removal_reason="landed HEAD; saving the uncommitted changes above first"
+            removal_prompt="Worktree ${worktree_path} has a landed HEAD - save the uncommitted changes above and remove it?"
+        fi
         if "$AUTO_DELETE_MERGED"; then
-            yellow "Auto-removing worktree '$worktree_path' (clean, landed HEAD)"
-            { remove_worktree "$worktree_path" "$worktree_locked" && delete_landed_branch "$worktree_branch"; } || true
-        elif confirm "Worktree ${worktree_path} is clean with a landed HEAD - remove it?"; then
-            { remove_worktree "$worktree_path" "$worktree_locked" && delete_landed_branch "$worktree_branch"; } || true
+            yellow "Auto-removing worktree '$worktree_path' ($removal_reason)"
+        elif ! confirm "$removal_prompt"; then
+            continue
+        fi
+        if [[ -n "$worktree_status" ]] && ! save_leftovers "$worktree_path" "$worktree_branch"; then
+            red "Unable to save the uncommitted changes in '$worktree_path'; keeping it."
+            continue
+        fi
+        if remove_worktree "$worktree_path" "$worktree_locked"; then
+            [[ -z "$worktree_status" ]] || green "Saved its uncommitted changes as '$leftovers_ref' (restore: git stash apply $leftovers_ref)."
+            delete_landed_branch "$worktree_branch" || true
+        elif [[ -n "$worktree_status" ]]; then
+            # A failed removal must leave the worktree as it found it, changes included.
+            { git -C "$worktree_path" stash apply --index --quiet "$leftovers_ref" && git update-ref -d "$leftovers_ref"; } \
+                || red "Unable to restore the uncommitted changes in '$worktree_path'; they are saved as '$leftovers_ref'."
         fi
         continue
     fi
